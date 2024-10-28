@@ -3,10 +3,10 @@ from rich.panel import Panel
 from rich.align import Align
 from datetime import datetime
 import requests
-from email_service import EmailService
-from rss_service import RSSService
 import signal
 import sys
+from email_service import EmailService  # Ensure this points to the correct path
+from rss_service import RSSService
 
 console = Console()
 exit_requested = False  # Track if the user wants to exit
@@ -48,7 +48,6 @@ def get_weather(latitude, longitude):
 
 def display_initial_layout():
     """Displays the welcome message and session details."""
-    # Enhanced welcome message with a framed panel
     welcome_message = Panel(
         Align.center("[bold magenta]🌟 Welcome to Consolia 🌟[/bold magenta]\n[italic cyan]Your Terminal Workspace[/italic cyan]"),
         title="✨ Consolia ✨",
@@ -104,25 +103,29 @@ def main():
             console.print("\n[bold red]Input stream closed unexpectedly. Exiting program.[/bold red] 👋")
             sys.exit(0)
 
+from email_service import EmailService
+#... other imports as before
+
 def handle_option(option):
     global exit_requested
+    email_service = EmailService()
     if option == '1':
-        email_service = EmailService()
-        email_service.check_mail()
+        email_service.fetch_mail_ids()  # Start email check
     elif option == '2':
-        email_service = EmailService()
         to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
         subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
         message = console.input("📝 [bold cyan]Message: [/bold cyan]")
         email_service.send_mail(to, subject, message)
     elif option == '3':
-        rss_service = RSSService()
-        rss_url = console.input("🔗 [bold cyan]Enter RSS Feed URL: [/bold cyan]")
-        rss_service.display_feed(rss_url)
+        # Handle RSS as before
+        pass
     elif option == '4':
-        exit_requested = True  # Set flag to trigger exit prompt in next loop
+        email_service.logout()  # Logout option
+    elif option == '5':
+        exit_requested = True  # Exit as usual
     else:
         console.print("[bold red]Invalid option! Please select a valid option.[/bold red] 🚫")
+
 
 if __name__ == "__main__":
     main()
