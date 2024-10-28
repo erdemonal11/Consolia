@@ -5,12 +5,17 @@ from datetime import datetime
 import requests
 import signal
 import sys
-from email_service import EmailService  # Ensure this points to the correct path
+from email_service import EmailService
 from rss_service import RSSService
 
 console = Console()
 exit_requested = False  # Track if the user wants to exit
 confirm_exit = False    # Track if Ctrl+C was pressed
+
+# Initialize the email service
+email_service = EmailService()
+
+rss_service = RSSService()
 
 def handle_exit_signal(signal_received, frame):
     """Flag exit confirmation when Ctrl+C is pressed."""
@@ -69,16 +74,23 @@ def display_initial_layout():
     console.print(f"[bold]📅  Date:[/bold] {date_str}")
     console.print(f"[bold]📍  Location:[/bold] {city}")
     console.print(f"[bold]🌤️   Weather:[/bold] {weather_info}\n")
-    console.print("[bold green]---------------------------------------------[/bold green]")
+    console.print("[bold green]=============================================[/bold green]")
 
 def display_options_menu():
     """Displays the options menu for user choices."""
     console.print("\n[bold yellow]🛠️   Options Menu:[/bold yellow]", style="bold underline")
-    console.print("[bold green]1.[/bold green] 📧  Check Email")
-    console.print("[bold green]2.[/bold green] ✉️   Send Email")
-    console.print("[bold green]3.[/bold green] 📖  View RSS Feeds")
-    console.print("[bold red]4.[/bold red] 🚪  Exit")
-    console.print("[bold green]---------------------------------------------[/bold green]")
+    
+    if not email_service.is_logged_in:
+        console.print("[bold green]1.[/bold green] 🔑  Login (Gmail)")
+        console.print("[bold green]2.[/bold green] 📖  View RSS Feeds")
+        console.print("[bold green]3.[/bold green] 🚪  Exit")
+    else:
+        console.print("[bold green]1.[/bold green] 📧  Check Email")
+        console.print("[bold green]2.[/bold green] ✉️   Send Email")
+        console.print("[bold green]3.[/bold green] 🔒  Logout")
+    
+    console.print("[bold green]=============================================[/bold green]")
+
 
 def main():
     global exit_requested, confirm_exit
@@ -96,33 +108,34 @@ def main():
 
             # Display options and handle user input
             display_options_menu()
-            option = console.input("\nChoose an option (1/2/3/4): ")
+            option = console.input("\nChoose an option: ")
             handle_option(option)
 
         except EOFError:
             console.print("\n[bold red]Input stream closed unexpectedly. Exiting program.[/bold red] 👋")
             sys.exit(0)
 
-from email_service import EmailService
-#... other imports as before
-
 def handle_option(option):
     global exit_requested
-    email_service = EmailService()
     if option == '1':
-        email_service.fetch_mail_ids()  # Start email check
+        if not email_service.is_logged_in:
+            email_service.login()  # Login
+        else:
+            email_service.fetch_mail_ids()  # Start email check if already logged in
     elif option == '2':
-        to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
-        subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
-        message = console.input("📝 [bold cyan]Message: [/bold cyan]")
-        email_service.send_mail(to, subject, message)
+        if not email_service.is_logged_in:
+            rss_service.display_all_feeds()
+        else:
+            to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
+            subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
+            message = console.input("📝 [bold cyan]Message: [/bold cyan]")
+            email_service.send_mail(to, subject, message)
     elif option == '3':
-        # Handle RSS as before
-        pass
-    elif option == '4':
-        email_service.logout()  # Logout option
-    elif option == '5':
-        exit_requested = True  # Exit as usual
+        if not email_service.is_logged_in:
+            console.print("[bold red]Exiting program...[/bold red] 👋")
+            sys.exit(0)
+        else:
+            email_service.logout()  # Logout option
     else:
         console.print("[bold red]Invalid option! Please select a valid option.[/bold red] 🚫")
 

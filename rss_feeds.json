@@ -1,0 +1,11 @@
+{
+    "suggested": {
+        "BBC News": "http://feeds.bbci.co.uk/news/rss.xml",
+        "TechCrunch": "http://feeds.feedburner.com/TechCrunch/",
+        "New York Times": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+        "CNN": "http://rss.cnn.com/rss/edition.rss"
+    },
+    "custom": {
+        "NBC News": "http://feeds.nbcnews.com/feeds/worldnews"
+    }
+}
