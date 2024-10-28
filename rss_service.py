@@ -59,7 +59,8 @@ class RSSService:
                 end = start + page_size
                 entries = feed.entries[start:end]
 
-                self.console.print(f"[bold cyan]RSS Entries (Page {page + 1}/{(len(feed.entries) - 1) // page_size + 1}):[/bold cyan]")
+                total_pages = (len(feed.entries) - 1) // page_size + 1
+                self.console.print(f"[bold cyan]RSS Entries (Page {page + 1}/{total_pages}):[/bold cyan]")
                 for i, entry in enumerate(entries, start=1):
                     self.console.print(Panel(
                         f"[bold green]{i + start}. Title:[/bold green] {entry.title}\n"
@@ -70,7 +71,7 @@ class RSSService:
                     ))
 
                 # Navigation commands
-                self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]read <number>[/blue] | [blue]exit[/blue]")
+                self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]read <number>[/blue] | [blue]go <page>[/blue] | [blue]exit[/blue]")
                 command = self.console.input("\nEnter command: ").strip().lower()
 
                 if command == "next":
@@ -83,6 +84,15 @@ class RSSService:
                         page -= 1
                     else:
                         self.console.print("[red]No previous pages.[/red]")
+                elif command.startswith("go "):
+                    try:
+                        go_to_page = int(command.split(" ")[1]) - 1
+                        if 0 <= go_to_page < total_pages:
+                            page = go_to_page
+                        else:
+                            self.console.print("[red]Invalid page number.[/red]")
+                    except ValueError:
+                        self.console.print("[red]Invalid page number.[/red]")
                 elif command.startswith("read "):
                     try:
                         entry_index = int(command.split(" ")[1]) - 1
@@ -118,7 +128,6 @@ class RSSService:
         command = self.console.input("\nEnter command: ").strip().lower()
 
         if command == "favorite" and not is_favorite:
-            # Add to favorites and save
             if not any(fav['link'] == entry['link'] for fav in self.favorites):
                 self.favorites.append({
                     "title": entry.get("title"),
@@ -130,9 +139,7 @@ class RSSService:
             else:
                 self.console.print("[yellow]Already in favorites.[/yellow]")
             self.display_full_entry(entry, is_favorite=True)
-
         elif command == "remove favorite" and is_favorite:
-            # Remove from favorites
             self.favorites = [fav for fav in self.favorites if fav['link'] != entry['link']]
             self.save_favorites()
             self.console.print("[green]Removed from favorites![/green]")
@@ -204,19 +211,20 @@ class RSSService:
                 self.console.print("[red]Invalid command. Please try again.[/red]")
 
     def display_favorites(self):
-        """Displays all saved favorite entries."""
+        """Displays all saved favorite entries with go-to-page functionality."""
         if not self.favorites:
             self.console.print("[yellow]No favorites found.[/yellow]")
             return
 
         page = 0
         page_size = 5
+        total_pages = (len(self.favorites) - 1) // page_size + 1
         while True:
             start = page * page_size
             end = start + page_size
             entries = self.favorites[start:end]
 
-            self.console.print(f"[bold cyan]Favorite Entries (Page {page + 1}/{(len(self.favorites) - 1) // page_size + 1}):[/bold cyan]")
+            self.console.print(f"[bold cyan]Favorite Entries (Page {page + 1}/{total_pages}):[/bold cyan]")
             for i, entry in enumerate(entries, start=1):
                 self.console.print(Panel(
                     f"[bold green]{i + start}. Title:[/bold green] {entry['title']}\n"
@@ -226,7 +234,7 @@ class RSSService:
                     box=box.ROUNDED
                 ))
 
-            self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]read <number>[/blue] | [blue]remove <number>[/blue] | [blue]exit[/blue]")
+            self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]go <page>[/blue] | [blue]read <number>[/blue] | [blue]remove <number>[/blue] | [blue]exit[/blue]")
             command = self.console.input("\nEnter command: ").strip().lower()
 
             if command == "next":
@@ -239,6 +247,15 @@ class RSSService:
                     page -= 1
                 else:
                     self.console.print("[red]No previous pages.[/red]")
+            elif command.startswith("go "):
+                try:
+                    go_to_page = int(command.split(" ")[1]) - 1
+                    if 0 <= go_to_page < total_pages:
+                        page = go_to_page
+                    else:
+                        self.console.print("[red]Invalid page number.[/red]")
+                except ValueError:
+                    self.console.print("[red]Invalid page number.[/red]")
             elif command.startswith("read "):
                 try:
                     index = int(command.split(" ")[1]) - 1

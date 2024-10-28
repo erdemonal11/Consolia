@@ -1,12 +1,13 @@
 import imaplib
 import smtplib
 import re
+import json
+import os
 from email.mime.text import MIMEText
 from email.parser import BytesParser
 from email.header import decode_header
 from rich.console import Console
 from rich.panel import Panel
-from rich.spinner import Spinner
 from rich import box
 
 class EmailService:
@@ -22,9 +23,10 @@ class EmailService:
         self.page_size = 5
         self.mail_ids = []
         self.prompt_shown = False
+        self.favorites = []
+        self.current_page_mail_ids = []
 
     def setup_credentials(self):
-        """Prompts the user to enter their email credentials only once per session."""
         if not self.prompt_shown:
             self.console.print("[yellow]Please enter your Gmail credentials. Note: Use an [bold]App Password[/bold] if you have two-factor authentication enabled.[/yellow]")
             self.console.print("[italic]For more info on App Passwords, visit [link=https://support.google.com/accounts/answer/185833]Google's App Password Guide[/link][/italic].")
@@ -40,7 +42,6 @@ class EmailService:
         self.password = self.console.input("App Password (not your Gmail password): ", password=True)
 
     def login(self):
-        """Logs in the user with provided credentials and retrieves their name."""
         self.setup_credentials()
         try:
             with imaplib.IMAP4_SSL(self.imap_server) as mail:
@@ -48,6 +49,8 @@ class EmailService:
                 self.is_logged_in = True
                 self.name = self.username.split("@")[0].title()
                 self.console.print(f"[green]Hi, {self.name}! You are now logged in.[/green]")
+                self.favorites_file = f"favorites_{self.username}.json"
+                self.load_favorites()
         except imaplib.IMAP4.error:
             self.console.print("[red]Authentication Error:[/red] Invalid credentials. Make sure you are using an App Password.")
             self.username = self.password = None
@@ -56,13 +59,23 @@ class EmailService:
             self.console.print(f"[red]Error:[/red] {str(e)}")
 
     def logout(self):
-        """Logs the user out by clearing stored credentials."""
         self.username = self.password = self.name = None
         self.is_logged_in = False
+        self.favorites = []
         self.console.print("[green]You have successfully logged out.[/green]")
 
+    def load_favorites(self):
+        if os.path.exists(self.favorites_file):
+            with open(self.favorites_file, "r") as file:
+                self.favorites = json.load(file)
+        else:
+            self.favorites = []
+
+    def save_favorites(self):
+        with open(self.favorites_file, "w") as file:
+            json.dump(self.favorites, file, indent=4)
+
     def fetch_mail_ids(self):
-        """Fetches email IDs and displays the email list."""
         if not self.is_logged_in:
             self.console.print("[red]You need to log in first.[/red]")
             return
@@ -84,15 +97,14 @@ class EmailService:
             self.console.print(f"[red]Error:[/red] {str(e)}")
 
     def display_emails(self):
-        """Displays a page of 5 emails at a time with pagination controls."""
         while True:
             start = self.page * self.page_size
             end = start + self.page_size
-            page_mail_ids = self.mail_ids[max(0, len(self.mail_ids) - end): len(self.mail_ids) - start]
+            self.current_page_mail_ids = self.mail_ids[max(0, len(self.mail_ids) - end): len(self.mail_ids) - start]
 
             self.console.print("[bold cyan]Emails (page {}/{}):[/bold cyan]".format(self.page + 1, (len(self.mail_ids) // self.page_size) + 1))
             
-            for i, mail_id in enumerate(page_mail_ids, start=1):
+            for i, mail_id in enumerate(self.current_page_mail_ids, start=1):
                 with imaplib.IMAP4_SSL(self.imap_server) as mail:
                     mail.login(self.username, self.password)
                     mail.select('inbox')
@@ -111,13 +123,12 @@ class EmailService:
                         box=box.ROUNDED
                     ))
 
-            self.console.print("\n[bold cyan]Commands:[/bold cyan] [blue]next[/blue] | [blue]prev[/blue] | [blue]select <number>[/blue] | [blue]exit[/blue]")
+            self.console.print("\n[bold cyan]Commands:[/bold cyan] [blue]next[/blue] | [blue]prev[/blue] | [blue]go <page number>[/blue] | [blue]select <number>[/blue] | [blue]exit[/blue]")
             
-            if not self.pagination_controls(page_mail_ids):
+            if not self.pagination_controls():
                 break
 
-    def pagination_controls(self, page_mail_ids):
-        """Handles pagination and selection of emails."""
+    def pagination_controls(self):
         while True:
             command = self.console.input("\nEnter command: ").strip().lower()
 
@@ -133,11 +144,22 @@ class EmailService:
                     return True
                 else:
                     self.console.print("[red]No previous pages.[/red]")
+            elif command.startswith("go "):
+                try:
+                    page_number = int(command.split(" ")[1]) - 1
+                    if 0 <= page_number <= len(self.mail_ids) // self.page_size:
+                        self.page = page_number
+                        return True
+                    else:
+                        self.console.print("[red]Invalid page number.[/red]")
+                except (IndexError, ValueError):
+                    self.console.print("[red]Invalid command. Use 'go <page number>' to jump to a page.[/red]")
             elif command.startswith("select "):
                 try:
                     index = int(command.split(" ")[1]) - 1
-                    if 0 <= index < len(page_mail_ids):
-                        self.display_email_detail(page_mail_ids[index])
+                    if 0 <= index < len(self.current_page_mail_ids):
+                        self.display_email_detail(self.current_page_mail_ids[index])
+                        return  # After showing detail, return to keep the main menu on the right page
                     else:
                         self.console.print("[red]Invalid selection. Choose a number from the current page.[/red]")
                 except (IndexError, ValueError):
@@ -148,7 +170,6 @@ class EmailService:
                 self.console.print("[red]Invalid command.[/red]")
 
     def display_email_detail(self, mail_id):
-        """Displays the full details of a selected email."""
         try:
             with imaplib.IMAP4_SSL(self.imap_server) as mail:
                 mail.login(self.username, self.password)
@@ -163,35 +184,162 @@ class EmailService:
                 from_address = email_message.get("From", "Unknown Sender")
                 body = email_message.get_payload(decode=True).decode("utf-8", errors="ignore") if email_message.get_payload(decode=True) else "No content"
 
-                self.console.print(Panel(
-                    f"[bold]From:[/bold] {from_address}\n[bold]Subject:[/bold] {subject}\n\n[bold]Message:[/bold]\n{body}",
-                    title="📨 Full Email",
-                    border_style="cyan",
-                    box=box.ROUNDED
-                ))
+                def display_email_commands(is_favorited):
+                    self.console.print(Panel(
+                        f"[bold]From:[/bold] {from_address}\n[bold]Subject:[/bold] {subject}\n\n[bold]Message:[/bold]\n{body}",
+                        title="📨 Full Email",
+                        border_style="cyan",
+                        box=box.ROUNDED
+                    ))
+                    command_options = "[blue]remove favorite[/blue]" if is_favorited else "[blue]favorite[/blue]"
+                    self.console.print(f"\n[bold yellow]Commands:[/bold yellow] {command_options} | [blue]back[/blue]")
+
+                is_favorited = any(fav["subject"] == subject for fav in self.favorites)
+                display_email_commands(is_favorited)
+
+                while True:
+                    command = self.console.input("\nEnter command: ").strip().lower()
+
+                    if command == "favorite" and not is_favorited:
+                        self.add_to_favorites(subject, from_address, body)
+                        is_favorited = True
+                        display_email_commands(is_favorited)
+                    elif command == "remove favorite" and is_favorited:
+                        self.remove_from_favorites(subject)
+                        is_favorited = False
+                        display_email_commands(is_favorited)
+                    elif command == "back":
+                        return  # Return to emails list directly without additional input
+                    else:
+                        self.console.print("[red]Invalid command. Please try again.[/red]")
 
         except Exception as e:
             self.console.print(f"[red]Error displaying email details: {e}[/red]")
 
-    def send_mail(self, to, subject, message):
-        """Sends an email with a loading animation."""
-        if not self.is_logged_in:
-            self.console.print("[red]You need to log in first.[/red]")
-            return
+    def add_to_favorites(self, subject, from_address, body):
+        favorite_entry = {
+            "subject": subject,
+            "from": from_address,
+            "body": body
+        }
+        self.favorites.append(favorite_entry)
+        self.save_favorites()
+        self.console.print("[green]Email added to favorites![/green]")
 
-        try:
-            with self.console.status("✉️  Sending email...", spinner="dots"):
-                msg = MIMEText(message)
-                msg['Subject'] = subject
-                msg['From'] = self.username
-                msg['To'] = to
+    def remove_from_favorites(self, subject):
+        self.favorites = [entry for entry in self.favorites if entry["subject"] != subject]
+        self.save_favorites()
+        self.console.print("[green]Email removed from favorites![/green]")
 
-                with smtplib.SMTP_SSL(self.smtp_server) as server:
-                    server.login(self.username, self.password)
-                    server.sendmail(self.username, to, msg.as_string())
+    def display_favorites(self):
+        page = 0
+        page_size = 5
+        while True:
+            start = page * page_size
+            end = start + page_size
+            entries = self.favorites[start:end]
+            self.console.print(f"[bold cyan]Favorite Emails (Page {page + 1}/{(len(self.favorites) - 1) // page_size + 1}):[/bold cyan]")
+            
+            for i, entry in enumerate(entries, start=1):
+                self.console.print(Panel(
+                    f"[bold]From:[/bold] {entry['from']}\n[bold]Subject:[/bold] {entry['subject']}",
+                    title="⭐ Favorite Email",
+                    border_style="green",
+                    box=box.ROUNDED
+                ))
 
-            self.console.print("[green]Email sent successfully![/green]")
-        except smtplib.SMTPAuthenticationError:
-            self.console.print("[red]Authentication Error:[/red] Invalid credentials.")
-        except Exception as e:
-            self.console.print(f"[red]Error:[/red] {str(e)}")
+            self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]go <page number>[/blue] | [blue]read <number>[/blue] | [blue]remove <number>[/blue] | [blue]back[/blue]")
+            command = self.console.input("\nEnter command: ").strip().lower()
+
+            if command == "next":
+                if end < len(self.favorites):
+                    page += 1
+                else:
+                    self.console.print("[red]No more pages.[/red]")
+            elif command == "prev":
+                if page > 0:
+                    page -= 1
+                else:
+                    self.console.print("[red]No previous pages.[/red]")
+            elif command.startswith("go "):
+                try:
+                    page_number = int(command.split(" ")[1]) - 1
+                    if 0 <= page_number <= len(self.favorites) // page_size:
+                        page = page_number
+                    else:
+                        self.console.print("[red]Invalid page number.[/red]")
+                except (IndexError, ValueError):
+                    self.console.print("[red]Invalid command. Use 'go <page number>' to jump to a page.[/red]")
+            elif command.startswith("read "):
+                try:
+                    index = int(command.split(" ")[1]) - 1
+                    if 0 <= index < len(entries):
+                        self.display_full_favorite(entries[index])
+                    else:
+                        self.console.print("[red]Invalid selection. Please choose a valid number.[/red]")
+                except (IndexError, ValueError):
+                    self.console.print("[red]Invalid command. Use 'read <number>' to view an entry.[/red]")
+            elif command.startswith("remove "):
+                try:
+                    index = int(command.split(" ")[1]) - 1
+                    if 0 <= index < len(entries):
+                        self.remove_from_favorites(entries[index]["subject"])
+                        entries.pop(index)
+                    else:
+                        self.console.print("[red]Invalid selection. Please choose a valid number.[/red]")
+                except (IndexError, ValueError):
+                    self.console.print("[red]Invalid command. Use 'remove <number>' to delete an entry.[/red]")
+            elif command == "back":
+                return
+            else:
+                self.console.print("[red]Invalid command. Please try again.[/red]")
+
+    def display_full_favorite(self, entry):
+        while True:
+            self.console.print(Panel(
+                f"[bold]From:[/bold] {entry['from']}\n[bold]Subject:[/bold] {entry['subject']}\n\n[bold]Message:[/bold]\n{entry['body']}",
+                title="⭐ Full Favorite Email",
+                border_style="cyan",
+                box=box.ROUNDED
+            ))
+            self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]remove favorite[/blue] | [blue]back[/blue]")
+
+            command = self.console.input("\nEnter command: ").strip().lower()
+            if command == "remove favorite":
+                self.remove_from_favorites(entry["subject"])
+                break  # Return to the favorites list immediately after removal
+            elif command == "back":
+                break
+            else:
+                self.console.print("[red]Invalid command. Please try again.[/red]")
+
+# Main Program with Updated Options Menu
+def main():
+    email_service = EmailService()
+    console = Console()
+    
+    while True:
+        console.print("\n[bold yellow]🛠️   Options Menu:[/bold yellow]", style="bold underline")
+        console.print("[bold green]1.[/bold green] 📧  Check Email")
+        console.print("[bold green]2.[/bold green] ✉️   Send Email")
+        console.print("[bold green]3.[/bold green] ⭐  Favorites")
+        console.print("[bold green]4.[/bold green] 🔒  Logout")
+        console.print("[bold green]=============================================[/bold green]")
+
+        option = console.input("\nChoose an option: ").strip()
+
+        if option == '1':
+            email_service.fetch_mail_ids()
+        elif option == '2':
+            to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
+            subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
+            message = console.input("📝 [bold cyan]Message: [/bold cyan]")
+            email_service.send_mail(to, subject, message)
+        elif option == '3':
+            email_service.display_favorites()
+        elif option == '4':
+            email_service.logout()
+            break
+        else:
+            console.print("[red]Invalid option. Please try again.[/red]")
+

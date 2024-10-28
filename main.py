@@ -12,9 +12,8 @@ console = Console()
 exit_requested = False  # Track if the user wants to exit
 confirm_exit = False    # Track if Ctrl+C was pressed
 
-# Initialize the email service
+# Initialize services
 email_service = EmailService()
-
 rss_service = RSSService()
 
 def handle_exit_signal(signal_received, frame):
@@ -87,7 +86,8 @@ def display_options_menu():
     else:
         console.print("[bold green]1.[/bold green] 📧  Check Email")
         console.print("[bold green]2.[/bold green] ✉️   Send Email")
-        console.print("[bold green]3.[/bold green] 🔒  Logout")
+        console.print("[bold green]3.[/bold green] ⭐  Favorites")
+        console.print("[bold green]4.[/bold green] 🔒  Logout")
     
     console.print("[bold green]=============================================[/bold green]")
 
@@ -135,10 +135,12 @@ def handle_option(option):
             console.print("[bold red]Exiting program...[/bold red] 👋")
             sys.exit(0)
         else:
+            email_service.display_favorites()  # Display favorites if logged in
+    elif option == '4':
+        if email_service.is_logged_in:
             email_service.logout()  # Logout option
-    else:
-        console.print("[bold red]Invalid option! Please select a valid option.[/bold red] 🚫")
-
+        else:
+            console.print("[bold red]Invalid option! Please select a valid option.[/bold red] 🚫")
 
 if __name__ == "__main__":
     main()
