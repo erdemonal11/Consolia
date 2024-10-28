@@ -1,72 +1,128 @@
-# main.py
-import os
 from rich.console import Console
-from rich.table import Table
-from rich.prompt import Prompt
-from email_module import check_inbox
-from rss_module import fetch_rss_feed
-from sites_module import show_sites
+from rich.panel import Panel
+from rich.align import Align
+from datetime import datetime
+import requests
+from email_service import EmailService
+from rss_service import RSSService
+import signal
+import sys
 
 console = Console()
+exit_requested = False  # Track if the user wants to exit
+confirm_exit = False    # Track if Ctrl+C was pressed
 
-def display_header():
-    """Display a welcome message with Rich formatting."""
-    console.clear()
-    console.print("[bold cyan]Welcome to Consolia![/bold cyan]", justify="center")
-    console.print("[bold]Terminal-based Social Media Interface[/bold]", justify="center")
-    console.print("=" * 50)
+def handle_exit_signal(signal_received, frame):
+    """Flag exit confirmation when Ctrl+C is pressed."""
+    global confirm_exit
+    confirm_exit = True
 
-def main_menu():
-    """Main menu of the application."""
+# Set up signal handling for Ctrl+C
+signal.signal(signal.SIGINT, handle_exit_signal)
+
+def get_location():
+    """Fetches location based on IP."""
+    try:
+        response = requests.get("https://ipinfo.io")
+        response.raise_for_status()
+        data = response.json()
+        location = data["loc"].split(",")
+        city = data["city"]
+        latitude, longitude = float(location[0]), float(location[1])
+        return {"city": city, "latitude": latitude, "longitude": longitude}
+    except requests.exceptions.RequestException as e:
+        console.print(f"[red]Error fetching location: {e}[/red] 🌐")
+        return {"city": "Unknown", "latitude": 40.7128, "longitude": -74.0060}
+
+def get_weather(latitude, longitude):
+    """Fetches current temperature data from Open Meteo."""
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current_weather=true"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        weather = data["current_weather"]
+        return f"{weather['temperature']}°C 🌡️"
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching weather data: {e} ☁️"
+
+def display_initial_layout():
+    """Displays the welcome message and session details."""
+    # Enhanced welcome message with a framed panel
+    welcome_message = Panel(
+        Align.center("[bold magenta]🌟 Welcome to Consolia 🌟[/bold magenta]\n[italic cyan]Your Terminal Workspace[/italic cyan]"),
+        title="✨ Consolia ✨",
+        border_style="magenta",
+        padding=(1, 2),
+    )
+    console.print("\n", welcome_message)
+
+    # Fetch date, location, and weather
+    now = datetime.now()
+    date_str = now.strftime("%A, %B %d, %Y - %H:%M")
+    location_data = get_location()
+    city = location_data["city"]
+    latitude, longitude = location_data["latitude"], location_data["longitude"]
+    weather_info = get_weather(latitude, longitude)
+
+    # Display Date, Location, and Weather
+    console.print("\n[bold cyan]🌍  Current Session Details[/bold cyan]", style="bold underline")
+    console.print(f"[bold]📅  Date:[/bold] {date_str}")
+    console.print(f"[bold]📍  Location:[/bold] {city}")
+    console.print(f"[bold]🌤️   Weather:[/bold] {weather_info}\n")
+    console.print("[bold green]---------------------------------------------[/bold green]")
+
+def display_options_menu():
+    """Displays the options menu for user choices."""
+    console.print("\n[bold yellow]🛠️   Options Menu:[/bold yellow]", style="bold underline")
+    console.print("[bold green]1.[/bold green] 📧  Check Email")
+    console.print("[bold green]2.[/bold green] ✉️   Send Email")
+    console.print("[bold green]3.[/bold green] 📖  View RSS Feeds")
+    console.print("[bold red]4.[/bold red] 🚪  Exit")
+    console.print("[bold green]---------------------------------------------[/bold green]")
+
+def main():
+    global exit_requested, confirm_exit
+    display_initial_layout()  # Display welcome message and details once
+
     while True:
-        display_header()
-        console.print("[1] Email")
-        console.print("[2] RSS Feed")
-        console.print("[3] Recommended Sites")
-        console.print("[Q] Quit")
+        try:
+            # Check if exit confirmation is needed due to Ctrl+C
+            if confirm_exit:
+                confirm_exit = False  # Reset flag
+                answer = console.input("[bold red]Are you sure you want to quit? (y/n): [/bold red]")
+                if answer.lower() == 'y':
+                    console.print("[bold red]Goodbye![/bold red] 👋")
+                    sys.exit(0)
 
-        choice = Prompt.ask("Choose an option", choices=["1", "2", "3", "Q"], default="Q").strip().upper()
+            # Display options and handle user input
+            display_options_menu()
+            option = console.input("\nChoose an option (1/2/3/4): ")
+            handle_option(option)
 
-        if choice == "1":
-            email_module()
-        elif choice == "2":
-            rss_module()
-        elif choice == "3":
-            show_sites_module()
-        elif choice == "Q":
-            console.print("Exiting... Goodbye!")
-            break
+        except EOFError:
+            console.print("\n[bold red]Input stream closed unexpectedly. Exiting program.[/bold red] 👋")
+            sys.exit(0)
 
-def email_module():
-    """Prompt user for email login and display inbox."""
-    console.print("\n[bold]Email Module[/bold]")
-    email = Prompt.ask("Enter your email")
-    password = Prompt.ask("Enter your password", password=True)
-
-    console.print("[bold cyan]Checking inbox...[/bold cyan]")
-    check_inbox(email, password)
-
-    console.print("\nPress Enter to return to the main menu.")
-    input()  # Wait for user to press Enter to return
-
-def rss_module():
-    """Fetch and display RSS feed articles."""
-    console.print("\n[bold]RSS Feed Module[/bold]")
-    rss_url = Prompt.ask("Enter the RSS feed URL", default="https://rss.cnn.com/rss/edition.rss")
-    
-    console.print("[bold cyan]Fetching RSS feed...[/bold cyan]")
-    fetch_rss_feed(rss_url)
-
-    console.print("\nPress Enter to return to the main menu.")
-    input()  # Wait for user to press Enter to return
-
-def show_sites_module():
-    """Display recommended sites."""
-    console.print("\n[bold]Recommended Sites[/bold]")
-    show_sites()
-
-    console.print("\nPress Enter to return to the main menu.")
-    input()  # Wait for user to press Enter to return
+def handle_option(option):
+    global exit_requested
+    if option == '1':
+        email_service = EmailService()
+        email_service.check_mail()
+    elif option == '2':
+        email_service = EmailService()
+        to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
+        subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
+        message = console.input("📝 [bold cyan]Message: [/bold cyan]")
+        email_service.send_mail(to, subject, message)
+    elif option == '3':
+        rss_service = RSSService()
+        rss_url = console.input("🔗 [bold cyan]Enter RSS Feed URL: [/bold cyan]")
+        rss_service.display_feed(rss_url)
+    elif option == '4':
+        exit_requested = True  # Set flag to trigger exit prompt in next loop
+    else:
+        console.print("[bold red]Invalid option! Please select a valid option.[/bold red] 🚫")
 
 if __name__ == "__main__":
-    main_menu()
+    main()
