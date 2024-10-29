@@ -81,17 +81,17 @@ def display_options_menu():
     console.print("\n[bold yellow]🛠️   Options Menu:[/bold yellow]", style="bold underline")
     
     if not email_service.is_logged_in:
+        # Show main options for general access
         console.print("[bold green]1.[/bold green] 🔑  Login (Gmail)")
         console.print("[bold green]2.[/bold green] 📖  View RSS Feeds")
         console.print("[bold green]3.[/bold green] 🚪  Exit")
         console.print("[bold green]4.[/bold green] 📈  View Stock Data")
         console.print("[bold green]5.[/bold green] ☁️   7-Day Weather Forecast")
     else:
+        # Show email-specific options when logged in
         console.print("[bold green]1.[/bold green] 📧  Check Email")
         console.print("[bold green]2.[/bold green] ✉️   Send Email")
         console.print("[bold green]3.[/bold green] 🔒  Logout")
-        console.print("[bold green]4.[/bold green] 📈  View Stock Data")
-        console.print("[bold green]5.[/bold green] ☁️  7-Day Weather Forecast")
 
     console.print("[bold green]=============================================[/bold green]")
 
@@ -170,14 +170,16 @@ def handle_option(option):
             message = console.input("📝 [bold cyan]Message: [/bold cyan]")
             email_service.send_mail(to, subject, message)
     elif option == '3':
-        console.print("[bold red]Exiting program...[/bold red] 👋")
-        sys.exit(0)
-    elif option == '4':
+        if email_service.is_logged_in:
+            email_service.logout()  # Logout option
+            console.print("[bold green]You have been logged out successfully! Returning to the main menu...[/bold green] 👋")
+        else:
+            console.print("[bold red]Exiting program...[/bold red] 👋")
+            sys.exit(0)
+    elif option == '4' and not email_service.is_logged_in:
         stock_option()  # Stock menu option
-    elif option == '5':
+    elif option == '5' and not email_service.is_logged_in:
         weather_option()  # Weather menu option
-    elif option == '6' and email_service.is_logged_in:
-        email_service.logout()  # Logout option
     else:
         console.print("[red]Invalid option! Please select a valid option.[/red] 🚫")
 
