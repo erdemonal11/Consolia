@@ -1,3 +1,4 @@
+# main.py
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
@@ -8,6 +9,7 @@ import sys
 from email_service import EmailService
 from rss_service import RSSService
 from utils import fetch_7_day_weather, fetch_stock_data, show_top_stocks
+from bot import chatbot_loop  # Import the advanced chatbot
 
 console = Console()
 exit_requested = False  # Track if the user wants to exit
@@ -54,7 +56,7 @@ def get_weather(latitude, longitude):
 def display_initial_layout():
     """Displays the welcome message and session details."""
     welcome_message = Panel(
-        Align.center("[bold magenta]🌟 Welcome to Consolia 🌟[/bold magenta]\n[italic cyan]Your Terminal Workspace[/italic cyan]"),
+        Align.center("[bold magenta]🌟  Welcome to Consolia 🌟[/bold magenta]\n[italic cyan] Your Terminal Workspace[/italic cyan]"),
         title="✨ Consolia ✨",
         border_style="magenta",
         padding=(1, 2),
@@ -84,9 +86,10 @@ def display_options_menu():
         # Show main options for general access
         console.print("[bold green]1.[/bold green] 🔑  Login (Gmail)")
         console.print("[bold green]2.[/bold green] 📖  View RSS Feeds")
-        console.print("[bold green]3.[/bold green] 🚪  Exit")
+        console.print("[bold green]3.[/bold green] 🤖  ChatBot")
         console.print("[bold green]4.[/bold green] 📈  View Stock Data")
         console.print("[bold green]5.[/bold green] ☁️   7-Day Weather Forecast")
+        console.print("[bold green]6.[/bold green] 🚪  Exit")
     else:
         # Show email-specific options when logged in
         console.print("[bold green]1.[/bold green] 📧  Check Email")
@@ -170,16 +173,14 @@ def handle_option(option):
             message = console.input("📝 [bold cyan]Message: [/bold cyan]")
             email_service.send_mail(to, subject, message)
     elif option == '3':
-        if email_service.is_logged_in:
-            email_service.logout()  # Logout option
-            console.print("[bold green]You have been logged out successfully! Returning to the main menu...[/bold green] 👋")
-        else:
-            console.print("[bold red]Exiting program...[/bold red] 👋")
-            sys.exit(0)
+        chatbot_loop()  # Launch ChatBot
     elif option == '4' and not email_service.is_logged_in:
         stock_option()  # Stock menu option
     elif option == '5' and not email_service.is_logged_in:
         weather_option()  # Weather menu option
+    elif option == '6' and not email_service.is_logged_in:
+        console.print("[bold red]Exiting program...[/bold red] 👋")
+        sys.exit(0)
     else:
         console.print("[red]Invalid option! Please select a valid option.[/red] 🚫")
 
