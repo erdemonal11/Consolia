@@ -63,19 +63,24 @@ Consolia guides you through each interaction with options menus. Use the numeric
 
 Below are screenshots showcasing Consolia’s features and user interface.
 
-1. **Application Welcome Screen**  
+1. **Application Welcome Screen**
+   
    ![Welcome Screen](images/welcome.png)
 
-2. **Email Management**  
+2. **Email Management**
+   
    ![Email Management](images/mail.png)
 
 3. **RSS Feed Viewer**  
+   
    ![RSS Feed Viewer](images/rss.png)
 
-4. **Stock and Weather Updates**  
+4. **Stock and Weather Updates**
+   
    ![Stock and Weather](images/stocknweather.png)
 
-5. **Chatbot Interaction**  
+5. **Chatbot Interaction**
+    
    ![Chatbot Interaction](images/bot.png)
 
 
