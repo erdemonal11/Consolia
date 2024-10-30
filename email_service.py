@@ -25,6 +25,7 @@ class EmailService:
         self.prompt_shown = False
         self.favorites = []
         self.current_page_mail_ids = []
+        self.signature = ""  
 
     def setup_credentials(self):
         if not self.prompt_shown:
@@ -50,7 +51,9 @@ class EmailService:
                 self.name = self.username.split("@")[0].title()
                 self.console.print(f"[green]Hi, {self.name}! You are now logged in.[/green]")
                 self.favorites_file = f"favorites_{self.username}.json"
+                self.signature_file = f"signature_{self.username}.json"
                 self.load_favorites()
+                self.load_signature()  
         except imaplib.IMAP4.error:
             self.console.print("[red]Authentication Error:[/red] Invalid credentials. Make sure you are using an App Password.")
             self.username = self.password = None
@@ -74,6 +77,49 @@ class EmailService:
     def save_favorites(self):
         with open(self.favorites_file, "w") as file:
             json.dump(self.favorites, file, indent=4)
+
+    def load_signature(self):
+        if os.path.exists(self.signature_file):
+            with open(self.signature_file, "r") as file:
+                self.signature = json.load(file).get("signature", "")
+        else:
+            self.signature = ""
+
+    def save_signature(self):
+        with open(self.signature_file, "w") as file:
+            json.dump({"signature": self.signature}, file, indent=4)
+
+    def set_signature(self):
+        self.console.print("[bold yellow]Set Your Email Signature[/bold yellow]")
+        self.signature = self.console.input("Enter your signature (or press Enter to leave blank): ")
+        self.save_signature()
+        self.console.print("[green]Signature saved successfully![/green]")
+
+    def send_mail(self, to, subject, message):
+        if not self.is_logged_in:
+            self.console.print("[red]You need to log in first.[/red]")
+            return
+
+        include_signature = self.console.input("🖊️ [bold cyan]Do you want to include your signature? (y/n): [/bold cyan]").strip().lower()
+        if include_signature == 'y' and self.signature:
+            full_message = f"{message}\n\n{self.signature}"
+        else:
+            full_message = message
+
+        try:
+            msg = MIMEText(full_message)
+            msg["Subject"] = subject
+            msg["From"] = self.username
+            msg["To"] = to
+
+            with smtplib.SMTP_SSL(self.smtp_server, 465) as server:
+                server.login(self.username, self.password)
+                server.sendmail(self.username, to, msg.as_string())
+            
+            self.console.print("[green]Email sent successfully![/green]")
+        except Exception as e:
+            self.console.print(f"[red]Error sending email:[/red] {str(e)}")
+
 
     def fetch_mail_ids(self):
         if not self.is_logged_in:
@@ -159,7 +205,7 @@ class EmailService:
                     index = int(command.split(" ")[1]) - 1
                     if 0 <= index < len(self.current_page_mail_ids):
                         self.display_email_detail(self.current_page_mail_ids[index])
-                        return  # After showing detail, return to keep the main menu on the right page
+                        return  
                     else:
                         self.console.print("[red]Invalid selection. Choose a number from the current page.[/red]")
                 except (IndexError, ValueError):
@@ -209,7 +255,7 @@ class EmailService:
                         is_favorited = False
                         display_email_commands(is_favorited)
                     elif command == "back":
-                        return  # Return to emails list directly without additional input
+                        return  
                     else:
                         self.console.print("[red]Invalid command. Please try again.[/red]")
 
@@ -307,13 +353,12 @@ class EmailService:
             command = self.console.input("\nEnter command: ").strip().lower()
             if command == "remove favorite":
                 self.remove_from_favorites(entry["subject"])
-                break  # Return to the favorites list immediately after removal
+                break  
             elif command == "back":
                 break
             else:
                 self.console.print("[red]Invalid command. Please try again.[/red]")
 
-# Main Program with Updated Options Menu
 def main():
     email_service = EmailService()
     console = Console()
@@ -323,7 +368,8 @@ def main():
         console.print("[bold green]1.[/bold green] 📧  Check Email")
         console.print("[bold green]2.[/bold green] ✉️   Send Email")
         console.print("[bold green]3.[/bold green] ⭐  Favorites")
-        console.print("[bold green]4.[/bold green] 🔒  Logout")
+        console.print("[bold green]4.[/bold green] 🖊️   Set Email Signature")  
+        console.print("[bold green]5.[/bold green] 🔒  Logout")
         console.print("[bold green]=============================================[/bold green]")
 
         option = console.input("\nChoose an option: ").strip()
@@ -338,6 +384,8 @@ def main():
         elif option == '3':
             email_service.display_favorites()
         elif option == '4':
+            email_service.set_signature()  
+        elif option == '5':
             email_service.logout()
             break
         else:

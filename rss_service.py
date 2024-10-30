@@ -9,12 +9,11 @@ class RSSService:
     def __init__(self, storage_file="rss_feeds.json"):
         self.console = Console()
         self.storage_file = storage_file
-        self.favorites_file = "rss_favorites.json"  # Separate file for favorites
+        self.favorites_file = "rss_favorites.json"  
         self.feeds = self.load_feeds()
         self.favorites = self.load_favorites()
 
     def load_feeds(self):
-        """Load RSS feed URLs from the storage file."""
         if os.path.exists(self.storage_file):
             with open(self.storage_file, "r") as file:
                 return json.load(file)
@@ -30,24 +29,20 @@ class RSSService:
         }
 
     def load_favorites(self):
-        """Load favorite RSS entries from a separate file."""
         if os.path.exists(self.favorites_file):
             with open(self.favorites_file, "r") as file:
                 return json.load(file)
         return []
 
     def save_feeds(self):
-        """Save the RSS feed URLs to the storage file."""
         with open(self.storage_file, "w") as file:
             json.dump(self.feeds, file, indent=4)
 
     def save_favorites(self):
-        """Save the favorite RSS entries to the favorites file."""
         with open(self.favorites_file, "w") as file:
             json.dump(self.favorites, file, indent=4)
 
     def display_feed(self, url):
-        """Fetch and display the latest RSS entries with pagination and full entry viewing."""
         self.console.print(f"[blue]Fetching RSS feed from: {url}[/blue]")
         feed = feedparser.parse(url)
 
@@ -70,7 +65,6 @@ class RSSService:
                         box=box.ROUNDED
                     ))
 
-                # Navigation commands
                 self.console.print("\n[bold yellow]Commands:[/bold yellow] [blue]next[/blue] | [blue]prev[/blue] | [blue]read <number>[/blue] | [blue]go <page>[/blue] | [blue]exit[/blue]")
                 command = self.console.input("\nEnter command: ").strip().lower()
 
@@ -110,7 +104,6 @@ class RSSService:
             self.console.print("[red]No entries found or unable to fetch the feed.[/red]")
 
     def display_full_entry(self, entry, is_favorite=False):
-        """Display the full details of a specific RSS entry."""
         self.console.print(Panel(
             f"[bold green]Title:[/bold green] {entry.get('title')}\n"
             f"[cyan]Link:[/cyan] {entry.get('link')}\n\n"
@@ -145,7 +138,6 @@ class RSSService:
             self.console.print("[green]Removed from favorites![/green]")
 
     def display_all_feeds(self):
-        """Display all saved RSS feeds for selection and allow navigation."""
         while True:
             self.console.print("\n[bold cyan]Available RSS Feeds:[/bold cyan]")
             all_feeds = {**self.feeds["suggested"], **self.feeds["custom"]}
@@ -211,7 +203,6 @@ class RSSService:
                 self.console.print("[red]Invalid command. Please try again.[/red]")
 
     def display_favorites(self):
-        """Displays all saved favorite entries with go-to-page functionality."""
         if not self.favorites:
             self.console.print("[yellow]No favorites found.[/yellow]")
             return

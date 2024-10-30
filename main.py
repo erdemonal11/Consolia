@@ -1,4 +1,3 @@
-# main.py
 from rich.console import Console
 from rich.panel import Panel
 from rich.align import Align
@@ -9,26 +8,22 @@ import sys
 from email_service import EmailService
 from rss_service import RSSService
 from utils import fetch_7_day_weather, fetch_stock_data, show_top_stocks
-from bot import chatbot_loop  # Import the advanced chatbot
+from bot import chatbot_loop  
 
 console = Console()
-exit_requested = False  # Track if the user wants to exit
-confirm_exit = False    # Track if Ctrl+C was pressed
+exit_requested = False  
+confirm_exit = False    
 
-# Initialize services
 email_service = EmailService()
 rss_service = RSSService()
 
 def handle_exit_signal(signal_received, frame):
-    """Flag exit confirmation when Ctrl+C is pressed."""
     global confirm_exit
     confirm_exit = True
 
-# Set up signal handling for Ctrl+C
 signal.signal(signal.SIGINT, handle_exit_signal)
 
 def get_location():
-    """Fetches location based on IP."""
     try:
         response = requests.get("https://ipinfo.io")
         response.raise_for_status()
@@ -42,7 +37,6 @@ def get_location():
         return {"city": "Unknown", "latitude": 40.7128, "longitude": -74.0060}
 
 def get_weather(latitude, longitude):
-    """Fetches current temperature data from Open Meteo."""
     url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current_weather=true"
     try:
         response = requests.get(url)
@@ -54,7 +48,6 @@ def get_weather(latitude, longitude):
         return f"Error fetching weather data: {e} ☁️"
 
 def display_initial_layout():
-    """Displays the welcome message and session details."""
     welcome_message = Panel(
         Align.center("[bold magenta]🌟  Welcome to Consolia 🌟[/bold magenta]\n[italic cyan] Your Terminal Workspace[/italic cyan]"),
         title="✨ Consolia ✨",
@@ -63,7 +56,6 @@ def display_initial_layout():
     )
     console.print("\n", welcome_message)
 
-    # Fetch date, location, and weather
     now = datetime.now()
     date_str = now.strftime("%A, %B %d, %Y - %H:%M")
     location_data = get_location()
@@ -71,7 +63,6 @@ def display_initial_layout():
     latitude, longitude = location_data["latitude"], location_data["longitude"]
     weather_info = get_weather(latitude, longitude)
 
-    # Display Date, Location, and Weather
     console.print("\n[bold cyan]🌍  Current Session Details[/bold cyan]", style="bold underline")
     console.print(f"[bold]📅  Date:[/bold] {date_str}")
     console.print(f"[bold]📍  Location:[/bold] {city}")
@@ -79,11 +70,9 @@ def display_initial_layout():
     console.print("[bold green]=============================================[/bold green]")
 
 def display_options_menu():
-    """Displays the main options menu for user choices."""
     console.print("\n[bold yellow]🛠️   Options Menu:[/bold yellow]", style="bold underline")
     
     if not email_service.is_logged_in:
-        # Show main options for general access
         console.print("[bold green]1.[/bold green] 🔑  Login (Gmail)")
         console.print("[bold green]2.[/bold green] 📖  View RSS Feeds")
         console.print("[bold green]3.[/bold green] 🤖  ChatBot")
@@ -91,15 +80,15 @@ def display_options_menu():
         console.print("[bold green]5.[/bold green] ☁️   7-Day Weather Forecast")
         console.print("[bold green]6.[/bold green] 🚪  Exit")
     else:
-        # Show email-specific options when logged in
         console.print("[bold green]1.[/bold green] 📧  Check Email")
         console.print("[bold green]2.[/bold green] ✉️   Send Email")
-        console.print("[bold green]3.[/bold green] 🔒  Logout")
+        console.print("[bold green]3.[/bold green] 🖊️   Set Email Signature")  
+        console.print("[bold green]4.[/bold green] 🔒  Logout")
 
     console.print("[bold green]=============================================[/bold green]")
 
+
 def stock_option():
-    """Displays stock option menu to choose from top stocks or search by symbol."""
     while True:
         console.print("\n[bold yellow]Stock Menu:[/bold yellow]")
         console.print("[bold green]1.[/bold green] 📊 Choose from Top 10 Stocks")
@@ -119,7 +108,6 @@ def stock_option():
             console.print("[red]Invalid choice! Please enter a number between 1 and 3.[/red]")
 
 def weather_option():
-    """Displays weather option menu to enter a new city for the forecast."""
     while True:
         console.print("\n[bold yellow]Weather Menu:[/bold yellow]")
         console.print("[bold green]1.[/bold green] 🌦️  Enter a New City for Weather")
@@ -137,19 +125,17 @@ def weather_option():
 
 def main():
     global exit_requested, confirm_exit
-    display_initial_layout()  # Display welcome message and details once
+    display_initial_layout()  
 
     while True:
         try:
-            # Check if exit confirmation is needed due to Ctrl+C
             if confirm_exit:
-                confirm_exit = False  # Reset flag
+                confirm_exit = False  
                 answer = console.input("[bold red]Are you sure you want to quit? (y/n): [/bold red]")
                 if answer.lower() == 'y':
                     console.print("[bold red]Goodbye![/bold red] 👋")
                     sys.exit(0)
 
-            # Display options and handle user input
             display_options_menu()
             option = console.input("\nChoose an option: ")
             handle_option(option)
@@ -161,23 +147,29 @@ def main():
 def handle_option(option):
     if option == '1':
         if not email_service.is_logged_in:
-            email_service.login()  # Login
+            email_service.login()  
         else:
-            email_service.fetch_mail_ids()  # Start email check if already logged in
+            email_service.fetch_mail_ids()  
     elif option == '2':
         if not email_service.is_logged_in:
-            rss_service.display_all_feeds()
+            rss_service.display_all_feeds()  
         else:
             to = console.input("📬 [bold cyan]Recipient Email Address: [/bold cyan]")
             subject = console.input("📜 [bold cyan]Subject: [/bold cyan]")
             message = console.input("📝 [bold cyan]Message: [/bold cyan]")
-            email_service.send_mail(to, subject, message)
+            email_service.send_mail(to, subject, message)  
     elif option == '3':
-        chatbot_loop()  # Launch ChatBot
-    elif option == '4' and not email_service.is_logged_in:
-        stock_option()  # Stock menu option
+        if not email_service.is_logged_in:
+            chatbot_loop()  
+        else:
+            email_service.set_signature()  
+    elif option == '4':
+        if not email_service.is_logged_in:
+            stock_option()  
+        else:
+            email_service.logout()  
     elif option == '5' and not email_service.is_logged_in:
-        weather_option()  # Weather menu option
+        weather_option()  
     elif option == '6' and not email_service.is_logged_in:
         console.print("[bold red]Exiting program...[/bold red] 👋")
         sys.exit(0)
